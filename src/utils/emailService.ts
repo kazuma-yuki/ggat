@@ -3,7 +3,7 @@
 // Tidak perlu daftar layanan luar, tidak ada limit.
 
 // Sesuaikan URL backend jika beda host/port
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000';
+const BACKEND_URL = import.meta.env.VITE_API_URL
 
 export const sendOtpEmail = async (
   toEmail: string,
