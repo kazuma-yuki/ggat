@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── PRINT STYLES ── */
+@media print {
+  /* Sembunyikan sidebar, nav, tombol */
+  nav, aside, header,
+  button,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Sembunyikan sidebar Layout (w-64) */
+  .min-h-screen > div:first-child {
+    display: none !important;
+  }
+
+  /* Main content ambil full width */
+  .min-h-screen {
+    display: block !important;
+  }
+
+  .min-h-screen > div:last-child {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Mobile header juga disembunyikan */
+  .lg\:hidden {
+    display: none !important;
+  }
+
+  /* Warna tetap muncul saat print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  html, body {
+    width: 100%;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    font-size: 11px;
+  }
+
+  /* Buka scroll/overflow supaya tabel tampil penuh */
+  .overflow-auto,
+  .overflow-scroll,
+  .overflow-x-auto,
+  .overflow-y-auto,
+  .overflow-y-auto {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+
+  /* Tabel */
+  table { width: 100%; border-collapse: collapse; page-break-inside: auto; }
+  tr { page-break-inside: avoid; page-break-after: auto; }
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+  th, td { font-size: 10px; padding: 4px 6px !important; white-space: normal !important; }
+
+  /* Kartu jangan terpotong antar halaman */
+  .rounded-2xl, .rounded-xl { page-break-inside: avoid; break-inside: avoid; }
+
+  /* Hide tooltip recharts */
+  .recharts-tooltip-wrapper { display: none !important; }
+  .recharts-legend-wrapper { position: static !important; }
+
+  /* Grid 4 kolom → 2 kolom */
+  .lg\:grid-cols-4 { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Padding */
+  .p-6 { padding: 12px !important; }
+}
