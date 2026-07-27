@@ -1,50 +1,37 @@
 import { User, StoredUser } from '../types';
 import { setCurrentUser, clearCurrentUser, getCurrentUser as storageGetCurrentUser } from './storage';
-import { sendOtpEmail } from './emailService';
 import {
   getUsersFromBackend, addUserToBackend,
   updateUserInBackend, deleteUserFromBackend,
 } from '../service/api';
 
-// OTP in-memory
-const otpStore = new Map<string, { otp: string; expires: number }>();
-
 // ── Auth ──────────────────────────────────────────────────────────────
-export const verifyCredentials = async (username: string, password: string): Promise<StoredUser | null> => {
-  const users = await ensureDefaultUsers();
-  return users.find(u => u.username === username && u.password === password) ?? null;
-};
+// Validasi username/password & OTP kini sepenuhnya di server
+// (lihat src/service/api.ts: loginRequest / verifyLoginOtp / forgotPassword*).
+// File ini hanya menyimpan sesi user yang sudah lolos verifikasi OTP.
 
-export const loginAfterOtp = (user: StoredUser): User => {
-  const userWithoutPassword: User = {
+export const loginAfterOtp = (user: User): User => {
+  const cleanUser: User = {
     id: user.id,
     username: user.username,
     name: user.name,
     role: user.role,
     ...(user.email ? { email: user.email } : {}),
   };
-  setCurrentUser(userWithoutPassword);
-  return userWithoutPassword;
+  setCurrentUser(cleanUser);
+  return cleanUser;
 };
 
-export const logout = (): void => { clearCurrentUser(); };
+export const saveSessionToken = (token: string): void => {
+  try { localStorage.setItem('sessionToken', token); } catch { /* ignore */ }
+};
+
+export const logout = (): void => {
+  clearCurrentUser();
+  try { localStorage.removeItem('sessionToken'); } catch { /* ignore */ }
+};
+
 export const getCurrentUser = (): User | null => storageGetCurrentUser();
-
-// ── OTP ───────────────────────────────────────────────────────────────
-export const generateAndSendOtp = async (user: StoredUser): Promise<{ success: boolean; error?: string }> => {
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  otpStore.set(user.username, { otp, expires: Date.now() + 5 * 60 * 1000 });
-  return sendOtpEmail(user.email, user.name, otp);
-};
-
-export const verifyOtp = (username: string, otp: string): boolean => {
-  const entry = otpStore.get(username);
-  if (!entry) return false;
-  if (Date.now() > entry.expires) { otpStore.delete(username); return false; }
-  if (entry.otp !== otp.trim()) return false;
-  otpStore.delete(username);
-  return true;
-};
 
 // ── User Management ───────────────────────────────────────────────────
 const ensureDefaultUsers = async (): Promise<StoredUser[]> => {

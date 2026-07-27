@@ -1,13 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Lock, User, Mail, RefreshCw, CheckCircle, KeyRound } from 'lucide-react';
-import { verifyCredentials, generateAndSendOtp, verifyOtp, loginAfterOtp, getUsers, updateUser } from '../../utils/auth';
-import type { StoredUser } from '../../types';
+import { loginAfterOtp, saveSessionToken } from '../../utils/auth';
+import {
+  loginRequest, verifyLoginOtp, resendLoginOtp,
+  forgotPasswordRequest, forgotPasswordResend, forgotPasswordVerify, forgotPasswordReset,
+} from '../../service/api';
 
 interface LoginFormProps {
   onLogin: (success: boolean) => void;
 }
 
 type Step = 'credentials' | 'otp' | 'forgot_username' | 'forgot_otp' | 'forgot_newpassword' | 'forgot_success';
+
+const errMsg = (err: unknown, fallback: string) =>
+  err instanceof Error ? err.message : fallback;
 
 const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
   // Step 1 – Credentials
@@ -16,9 +22,10 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
   const [credError, setCredError] = useState('');
   const [credLoading, setCredLoading] = useState(false);
 
-  // Step 2 – OTP (login)
+  // Step 2 – OTP (login). Semua verifikasi di server; client hanya pegang token.
   const [step, setStep] = useState<Step>('credentials');
-  const [pendingUser, setPendingUser] = useState<StoredUser | null>(null);
+  const [loginToken, setLoginToken] = useState('');
+  const [loginEmail, setLoginEmail] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [otpError, setOtpError] = useState('');
   const [otpLoading, setOtpLoading] = useState(false);
@@ -29,14 +36,16 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
   const [forgotUsername, setForgotUsername] = useState('');
   const [forgotError, setForgotError] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotToken, setForgotToken] = useState('');
+  const [forgotEmail, setForgotEmail] = useState('');
   const [forgotOtp, setForgotOtp] = useState(['', '', '', '', '', '']);
   const [forgotOtpError, setForgotOtpError] = useState('');
   const [forgotOtpLoading, setForgotOtpLoading] = useState(false);
+  const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [newPassError, setNewPassError] = useState('');
   const [newPassLoading, setNewPassLoading] = useState(false);
-  const [forgotUser, setForgotUser] = useState<StoredUser | null>(null);
 
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
   const forgotOtpRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -48,33 +57,27 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
     return () => clearInterval(t);
   }, [resendCooldown]);
 
-  // ── Step 1: cek username + password ──────────────────────────────────
+  // ── Step 1: kirim username + password ke server ──────────────────────
   const handleCredentialSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setCredLoading(true);
-    setCredError('');
-
-    const user = await verifyCredentials(username, password);
-    if (!user) {
-      setCredError('Username atau password tidak valid');
-      setCredLoading(false);
-      return;
-    }
-
     setSendingOtp(true);
-    const result = await generateAndSendOtp(user);
-    setSendingOtp(false);
-    setCredLoading(false);
-
-    if (!result.success) {
-      setCredError(result.error ?? 'Gagal mengirim OTP. Coba lagi.');
-      return;
+    setCredError('');
+    try {
+      // Server cek username & password, generate + kirim OTP, balikin token minimal.
+      const res = await loginRequest(username, password);
+      setLoginToken(res.token);
+      setLoginEmail(res.email);
+      setOtp(['', '', '', '', '', '']);
+      setStep('otp');
+      setResendCooldown(60);
+      setTimeout(() => otpRefs.current[0]?.focus(), 100);
+    } catch (err) {
+      setCredError(errMsg(err, 'Username atau password salah.'));
+    } finally {
+      setCredLoading(false);
+      setSendingOtp(false);
     }
-
-    setPendingUser(user);
-    setStep('otp');
-    setResendCooldown(60);
-    setTimeout(() => otpRefs.current[0]?.focus(), 100);
   };
 
   // ── Step 2: input OTP (login) ─────────────────────────────────────────
@@ -104,37 +107,41 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
 
   const handleOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pendingUser) return;
+    if (!loginToken) return;
     const code = otp.join('');
     if (code.length < 6) { setOtpError('Masukkan 6 digit kode OTP'); return; }
 
     setOtpLoading(true);
     setOtpError('');
-
-    await new Promise(r => setTimeout(r, 400));
-
-    const ok = verifyOtp(pendingUser.username, code);
-    if (!ok) {
-      setOtpError('Kode OTP salah atau sudah kadaluarsa');
-      setOtpLoading(false);
+    try {
+      // Verifikasi OTP di server → dapat sessionToken + data user (tanpa password).
+      const res = await verifyLoginOtp(loginToken, code);
+      saveSessionToken(res.sessionToken);
+      loginAfterOtp(res.user);
+      onLogin(true);
+    } catch (err) {
+      setOtpError(errMsg(err, 'Kode OTP salah atau sudah kadaluarsa'));
       setOtp(['', '', '', '', '', '']);
       otpRefs.current[0]?.focus();
-      return;
+    } finally {
+      setOtpLoading(false);
     }
-
-    loginAfterOtp(pendingUser);
-    onLogin(true);
   };
 
   const handleResend = async () => {
-    if (!pendingUser || resendCooldown > 0) return;
+    if (!loginToken || resendCooldown > 0) return;
     setSendingOtp(true);
     setOtpError('');
     setOtp(['', '', '', '', '', '']);
-    await generateAndSendOtp(pendingUser);
-    setSendingOtp(false);
-    setResendCooldown(60);
-    otpRefs.current[0]?.focus();
+    try {
+      await resendLoginOtp(loginToken);
+      setResendCooldown(60);
+    } catch (err) {
+      setOtpError(errMsg(err, 'Gagal mengirim ulang OTP.'));
+    } finally {
+      setSendingOtp(false);
+      otpRefs.current[0]?.focus();
+    }
   };
 
   // ── LUPA SANDI: Step 1 - Input Username ──────────────────────────────
@@ -142,37 +149,22 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
     e.preventDefault();
     setForgotError('');
     setForgotLoading(true);
-
-    const users = await getUsers();
-    const found = users.find(u => u.username === forgotUsername.trim());
-
-    if (!found) {
-      setForgotError('Username tidak ditemukan');
-      setForgotLoading(false);
-      return;
-    }
-
-    if (!found.email) {
-      setForgotError('Akun ini tidak memiliki email terdaftar');
-      setForgotLoading(false);
-      return;
-    }
-
     setSendingOtp(true);
-    const result = await generateAndSendOtp(found);
-    setSendingOtp(false);
-    setForgotLoading(false);
-
-    if (!result.success) {
-      setForgotError(result.error ?? 'Gagal mengirim OTP. Coba lagi.');
-      return;
+    try {
+      // Server cari username, cek email, kirim OTP reset, balikin token.
+      const res = await forgotPasswordRequest(forgotUsername.trim());
+      setForgotToken(res.token);
+      setForgotEmail(res.email);
+      setForgotOtp(['', '', '', '', '', '']);
+      setStep('forgot_otp');
+      setResendCooldown(60);
+      setTimeout(() => forgotOtpRefs.current[0]?.focus(), 100);
+    } catch (err) {
+      setForgotError(errMsg(err, 'Gagal mengirim OTP. Coba lagi.'));
+    } finally {
+      setForgotLoading(false);
+      setSendingOtp(false);
     }
-
-    setForgotUser(found);
-    setForgotOtp(['', '', '', '', '', '']);
-    setStep('forgot_otp');
-    setResendCooldown(60);
-    setTimeout(() => forgotOtpRefs.current[0]?.focus(), 100);
   };
 
   // ── LUPA SANDI: Step 2 - Verifikasi OTP ──────────────────────────────
@@ -202,46 +194,49 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
 
   const handleForgotOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!forgotUser) return;
+    if (!forgotToken) return;
     const code = forgotOtp.join('');
     if (code.length < 6) { setForgotOtpError('Masukkan 6 digit kode OTP'); return; }
 
     setForgotOtpLoading(true);
     setForgotOtpError('');
-
-    await new Promise(r => setTimeout(r, 400));
-
-    const ok = verifyOtp(forgotUser.username, code);
-    if (!ok) {
-      setForgotOtpError('Kode OTP salah atau sudah kadaluarsa');
-      setForgotOtpLoading(false);
+    try {
+      // Server verifikasi OTP reset → balikin resetToken (izin ganti password).
+      const res = await forgotPasswordVerify(forgotToken, code);
+      setResetToken(res.resetToken);
+      setNewPassword('');
+      setConfirmPassword('');
+      setNewPassError('');
+      setStep('forgot_newpassword');
+    } catch (err) {
+      setForgotOtpError(errMsg(err, 'Kode OTP salah atau sudah kadaluarsa'));
       setForgotOtp(['', '', '', '', '', '']);
       forgotOtpRefs.current[0]?.focus();
-      return;
+    } finally {
+      setForgotOtpLoading(false);
     }
-
-    setForgotOtpLoading(false);
-    setNewPassword('');
-    setConfirmPassword('');
-    setNewPassError('');
-    setStep('forgot_newpassword');
   };
 
   const handleForgotResend = async () => {
-    if (!forgotUser || resendCooldown > 0) return;
+    if (!forgotToken || resendCooldown > 0) return;
     setSendingOtp(true);
     setForgotOtpError('');
     setForgotOtp(['', '', '', '', '', '']);
-    await generateAndSendOtp(forgotUser);
-    setSendingOtp(false);
-    setResendCooldown(60);
-    forgotOtpRefs.current[0]?.focus();
+    try {
+      await forgotPasswordResend(forgotToken);
+      setResendCooldown(60);
+    } catch (err) {
+      setForgotOtpError(errMsg(err, 'Gagal mengirim ulang OTP.'));
+    } finally {
+      setSendingOtp(false);
+      forgotOtpRefs.current[0]?.focus();
+    }
   };
 
   // ── LUPA SANDI: Step 3 - Buat Password Baru ──────────────────────────
   const handleNewPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!forgotUser) return;
+    if (!resetToken) return;
 
     if (newPassword.length < 6) {
       setNewPassError('Password minimal 6 karakter');
@@ -254,11 +249,15 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
 
     setNewPassLoading(true);
     setNewPassError('');
-
-    await updateUser(forgotUser.id!, { password: newPassword });
-
-    setNewPassLoading(false);
-    setStep('forgot_success');
+    try {
+      // Server ganti password memakai resetToken yang sah.
+      await forgotPasswordReset(resetToken, newPassword);
+      setStep('forgot_success');
+    } catch (err) {
+      setNewPassError(errMsg(err, 'Gagal menyimpan password baru.'));
+    } finally {
+      setNewPassLoading(false);
+    }
   };
 
   // ── Reset ke halaman login ────────────────────────────────────────────
@@ -267,17 +266,16 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
     setUsername('');
     setPassword('');
     setCredError('');
+    setLoginToken('');
+    setLoginEmail('');
     setForgotUsername('');
     setForgotError('');
-    setForgotUser(null);
+    setForgotToken('');
+    setForgotEmail('');
+    setResetToken('');
     setForgotOtp(['', '', '', '', '', '']);
     setNewPassword('');
     setConfirmPassword('');
-  };
-
-  const maskedEmail = (user: StoredUser | null) => {
-    if (!user?.email) return '';
-    return user.email.replace(/(.{2})(.*)(@.*)/, (_, a, b, c) => a + '*'.repeat(b.length) + c);
   };
 
   return (
@@ -380,7 +378,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
                 </div>
                 <h3 className="text-lg font-bold text-gray-900">Verifikasi OTP</h3>
                 <p className="mt-1 text-sm text-gray-600">Kode 6 digit telah dikirim ke</p>
-                <p className="text-sm font-semibold text-blue-700">{maskedEmail(pendingUser)}</p>
+                <p className="text-sm font-semibold text-blue-700">{loginEmail}</p>
                 <p className="mt-1 text-xs text-gray-400">Berlaku selama 5 menit</p>
               </div>
 
@@ -503,7 +501,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
                 </div>
                 <h3 className="text-lg font-bold text-gray-900">Masukkan Kode OTP</h3>
                 <p className="mt-1 text-sm text-gray-600">Kode 6 digit telah dikirim ke</p>
-                <p className="text-sm font-semibold text-orange-600">{maskedEmail(forgotUser)}</p>
+                <p className="text-sm font-semibold text-orange-600">{forgotEmail}</p>
                 <p className="mt-1 text-xs text-gray-400">Berlaku selama 5 menit</p>
               </div>
 
@@ -573,7 +571,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
                 </div>
                 <h3 className="text-lg font-bold text-gray-900">Buat Password Baru</h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  Masukkan password baru untuk akun <span className="font-semibold text-gray-700">{forgotUser?.username}</span>
+                  Masukkan password baru untuk akun <span className="font-semibold text-gray-700">{forgotUsername}</span>
                 </p>
               </div>
 
@@ -636,7 +634,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
                 </div>
                 <h3 className="text-lg font-bold text-gray-900">Password Berhasil Diubah!</h3>
                 <p className="mt-2 text-sm text-gray-500">
-                  Password akun <span className="font-semibold text-gray-700">{forgotUser?.username}</span> sudah diperbarui.
+                  Password akun <span className="font-semibold text-gray-700">{forgotUsername}</span> sudah diperbarui.
                   Silakan login dengan password baru kamu.
                 </p>
               </div>

@@ -80,17 +80,6 @@ export const deleteJasaCatJob = (id: string) =>
   fetchJSON<void>(`${BASE_URL}/jasa-cat-jobs/${id}`, { method: "DELETE" });
 
 // =====================
-// PAINT BATCHES
-// =====================
-export const getPaintBatches = () => fetchJSON<unknown[]>(`${BASE_URL}/paint-batches`);
-export const addPaintBatch = (data: unknown) =>
-  fetchJSON<unknown>(`${BASE_URL}/paint-batches`, { method: "POST", body: JSON.stringify(data) });
-export const updatePaintBatch = (id: string, data: unknown) =>
-  fetchJSON<unknown>(`${BASE_URL}/paint-batches/${id}`, { method: "PUT", body: JSON.stringify(data) });
-export const deletePaintBatch = (id: string) =>
-  fetchJSON<void>(`${BASE_URL}/paint-batches/${id}`, { method: "DELETE" });
-
-// =====================
 // SERVICE TYPES
 // =====================
 export type ServiceTypeData = {
@@ -118,6 +107,48 @@ export const updateCategory = (name: string, data: CategoryEntry) =>
   });
 export const deleteCategory = (name: string) =>
   fetchJSON<void>(`${BASE_URL}/categories/${encodeURIComponent(name)}`, { method: "DELETE" });
+
+// =====================
+// AUTH (login + OTP di server)
+// =====================
+export type LoginResponse = { token: string; username: string; email: string };
+export type AuthUser = {
+  id: string; username: string; name: string; role: "admin" | "staff"; email: string;
+};
+export type VerifyOtpResponse = { sessionToken: string; user: AuthUser };
+
+// Langkah 1 login: kirim username+password, server balikin token + email tersamar.
+export const loginRequest = (username: string, password: string) =>
+  fetchJSON<LoginResponse>(`${BASE_URL}/login`, {
+    method: "POST", body: JSON.stringify({ username, password }),
+  });
+// Langkah 2 login: verifikasi OTP di server.
+export const verifyLoginOtp = (token: string, otp: string) =>
+  fetchJSON<VerifyOtpResponse>(`${BASE_URL}/verify-otp`, {
+    method: "POST", body: JSON.stringify({ token, otp }),
+  });
+export const resendLoginOtp = (token: string) =>
+  fetchJSON<{ success: boolean }>(`${BASE_URL}/resend-otp`, {
+    method: "POST", body: JSON.stringify({ token }),
+  });
+
+// Lupa sandi (semua di server)
+export const forgotPasswordRequest = (username: string) =>
+  fetchJSON<{ token: string; email: string }>(`${BASE_URL}/forgot-password`, {
+    method: "POST", body: JSON.stringify({ username }),
+  });
+export const forgotPasswordResend = (token: string) =>
+  fetchJSON<{ success: boolean }>(`${BASE_URL}/forgot-password/resend`, {
+    method: "POST", body: JSON.stringify({ token }),
+  });
+export const forgotPasswordVerify = (token: string, otp: string) =>
+  fetchJSON<{ resetToken: string }>(`${BASE_URL}/forgot-password/verify`, {
+    method: "POST", body: JSON.stringify({ token, otp }),
+  });
+export const forgotPasswordReset = (resetToken: string, newPassword: string) =>
+  fetchJSON<{ success: boolean }>(`${BASE_URL}/forgot-password/reset`, {
+    method: "POST", body: JSON.stringify({ resetToken, newPassword }),
+  });
 
 // =====================
 // USERS
