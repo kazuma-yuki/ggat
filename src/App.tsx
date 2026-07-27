@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import LoginForm from './components/auth/LoginForm';
 import Layout from './components/common/Layout';
 import Dashboard from './components/dashboard/Dashboard';
@@ -7,13 +7,28 @@ import SalesManager from './components/sales/SalesManager';
 import ReportsManager from './components/reports/ReportsManager';
 import JasaCatManager from './components/services/JasaCatManager';
 import UserManager from './components/users/UserManager';
-import { getCurrentUser } from './utils/auth';
+import { getCurrentUser, validateSession } from './utils/auth';
+import type { User } from './types';
 import { initializeDefaultData } from './utils/storage';
 import { loadColorCache } from './utils/categoryColors';
 
 function App() {
-  const [user, setUser] = useState(getCurrentUser());
+  const [user, setUser] = useState<User | null>(null);
+  const [checking, setChecking] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  // Validasi sesi ke server saat load. Identitas & role diambil dari /me
+  // (sumber kebenaran di server), sehingga localStorage tidak bisa dipercaya untuk hak akses.
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const validated = await validateSession();
+      if (!mounted) return;
+      setUser(validated);
+      setChecking(false);
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -59,6 +74,14 @@ function App() {
       setUser(getCurrentUser());
     }
   };
+
+  if (checking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-500">
+        Memeriksa sesi...
+      </div>
+    );
+  }
 
   if (!user) {
     return <LoginForm onLogin={handleLogin} />;

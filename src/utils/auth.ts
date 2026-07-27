@@ -1,6 +1,7 @@
 import { User, StoredUser } from '../types';
 import { setCurrentUser, clearCurrentUser, getCurrentUser as storageGetCurrentUser } from './storage';
 import {
+  getMe,
   getUsersFromBackend, addUserToBackend,
   updateUserInBackend, deleteUserFromBackend,
 } from '../service/api';
@@ -32,6 +33,30 @@ export const logout = (): void => {
 };
 
 export const getCurrentUser = (): User | null => storageGetCurrentUser();
+
+// Validasi sesi ke server. Role/identitas diambil dari /me (bukan localStorage),
+// sehingga mengubah localStorage tidak bisa menaikkan hak akses.
+export const validateSession = async (): Promise<User | null> => {
+  let token: string | null = null;
+  try { token = localStorage.getItem('sessionToken'); } catch { token = null; }
+  if (!token) { logout(); return null; }
+  try {
+    const u = await getMe();
+    const clean: User = {
+      id: u.id,
+      username: u.username,
+      name: u.name,
+      role: u.role,
+      ...(u.email ? { email: u.email } : {}),
+    };
+    setCurrentUser(clean);
+    return clean;
+  } catch {
+    // Token tidak valid / kedaluwarsa → paksa logout.
+    logout();
+    return null;
+  }
+};
 
 // ── User Management ───────────────────────────────────────────────────
 const ensureDefaultUsers = async (): Promise<StoredUser[]> => {

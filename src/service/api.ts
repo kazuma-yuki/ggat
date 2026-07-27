@@ -3,9 +3,19 @@ const BASE_URL = import.meta.env.VITE_API_URL;
 type APIError = { detail?: string };
 
 const fetchJSON = async <T>(url: string, options?: RequestInit): Promise<T> => {
+  // Lampirkan sessionToken supaya server bisa memvalidasi otorisasi (bukan localStorage).
+  let authHeader: Record<string, string> = {};
+  try {
+    const t = localStorage.getItem("sessionToken");
+    if (t) authHeader = { Authorization: `Bearer ${t}` };
+  } catch { /* ignore */ }
   const res = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
     ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeader,
+      ...((options?.headers as Record<string, string>) ?? {}),
+    },
   });
   let data: unknown = null;
   try { data = await res.json(); } catch { data = null; }
@@ -131,6 +141,9 @@ export const resendLoginOtp = (token: string) =>
   fetchJSON<{ success: boolean }>(`${BASE_URL}/resend-otp`, {
     method: "POST", body: JSON.stringify({ token }),
   });
+
+// Sumber kebenaran identitas & role user yang sedang login (validasi sessionToken).
+export const getMe = () => fetchJSON<AuthUser>(`${BASE_URL}/me`);
 
 // Lupa sandi (semua di server)
 export const forgotPasswordRequest = (username: string) =>
