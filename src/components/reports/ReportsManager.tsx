@@ -404,12 +404,15 @@ const ReportsManager: React.FC<ReportsManagerProps> = ({ type }) => {
       const s = String(v);
       return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    return [headers, ...rows].map((r) => r.map(escape).join(',')).join('\n');
+    return [headers, ...rows].map((r) => r.map(escape).join(',')).join('\r\n');
   };
 
   const downloadCSV = (filename: string, csvContent: string) => {
     const bom = '\uFEFF';
-    const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+    // "sep=," memberi tahu Excel bahwa pemisah kolom adalah koma (agar rapi
+    // di semua lokal Windows, termasuk yang default-nya titik koma).
+    const content = bom + 'sep=,\r\n' + csvContent;
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = filename; a.click();
