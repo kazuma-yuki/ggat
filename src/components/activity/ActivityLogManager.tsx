@@ -13,7 +13,7 @@ const ENTITY_LABEL: Record<string, string> = {
 
 const ACTION_META: Record<string, { label: string; cls: string; Icon: React.ComponentType<{ className?: string }> }> = {
   create: { label: 'Tambah', cls: 'bg-green-100 text-green-700', Icon: PlusCircle },
-  update: { label: 'Ubah', cls: 'bg-blue-100 text-blue-700', Icon: Pencil },
+  update: { label: 'Edit', cls: 'bg-blue-100 text-blue-700', Icon: Pencil },
   delete: { label: 'Hapus', cls: 'bg-red-100 text-red-700', Icon: Trash2 },
 };
 
