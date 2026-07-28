@@ -17,6 +17,11 @@ const ACTION_META: Record<string, { label: string; cls: string; Icon: React.Comp
   delete: { label: 'Hapus', cls: 'bg-red-100 text-red-700', Icon: Trash2 },
 };
 
+const ymd = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const todayYMD = () => ymd(new Date());
+const daysAgoYMD = (n: number) => ymd(new Date(Date.now() - n * 86400000));
+
 const formatWaktu = (iso: string): string => {
   if (!iso) return '-';
   const d = new Date(iso);
@@ -34,8 +39,8 @@ const ActivityLogManager: React.FC = () => {
   const [search, setSearch] = useState('');
   const [actionFilter, setActionFilter] = useState<'all' | 'create' | 'update' | 'delete'>('all');
   const [entityFilter, setEntityFilter] = useState<string>('all');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  const [fromDate, setFromDate] = useState(todayYMD());
+  const [toDate, setToDate] = useState(todayYMD());
 
   const reload = async () => {
     setLoading(true);
@@ -141,15 +146,13 @@ const ActivityLogManager: React.FC = () => {
             onChange={(e) => setToDate(e.target.value)}
             className="px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
           />
-          {(fromDate || toDate) && (
-            <button
-              type="button"
-              onClick={() => { setFromDate(''); setToDate(''); }}
-              className="text-xs text-gray-500 hover:text-gray-700 underline whitespace-nowrap"
-            >
-              Reset
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => { setFromDate(daysAgoYMD(30)); setToDate(todayYMD()); }}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 whitespace-nowrap"
+          >
+            Semua
+          </button>
         </div>
       </div>
 

@@ -6,7 +6,7 @@ import {
   type JasaCatJob,
 } from '../../utils/storage';
 import { getProducts, updateProductStock, type Product, getServiceTypes, addServiceType, updateServiceType, deleteServiceType, getCategories } from '../../service/api';
-import { Plus, Trash2, Settings, X, ChevronDown, ChevronUp, Pencil, Check, Calendar, ShoppingCart } from 'lucide-react';
+import { Plus, Trash2, Settings, X, ChevronDown, ChevronUp, Pencil, Check, Calendar, ShoppingCart, Search } from 'lucide-react';
 import { getServiceColor, getAllUsedColors } from '../../utils/categoryColors';
 import Modal from '../common/Modal';
 
@@ -287,8 +287,9 @@ export default function JasaCatManager() {
   const [txForm, setTxForm] = useState<TransactionForm>(emptyTransactionForm());
   const [svcForm, setSvcForm] = useState<ServiceItemForm>({ serviceTypeId: 'cat', motorType: 'bebek', catColor: 'merah', selectedOliId: '', selectedLinkedProductId: '', discount: '' });
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateFrom, setDateFrom] = useState(todayString());
+  const [dateTo, setDateTo] = useState(todayString());
+  const [searchCustomer, setSearchCustomer] = useState('');
   const [oliProducts, setOliProducts] = useState<Product[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [serviceTypes, setServiceTypes] = useState<CustomServiceType[]>(DEFAULT_SERVICES);
@@ -530,13 +531,15 @@ export default function JasaCatManager() {
   };
 
   const filteredJobs = useMemo(() => {
+    const q = searchCustomer.trim().toLowerCase();
     return jobs.filter((job) => {
-      const jobDate = String(job.date ?? '');
+      const jobDate = String(job.date ?? '').slice(0, 10);
       const matchFrom = !dateFrom || jobDate >= dateFrom;
       const matchTo = !dateTo || jobDate <= dateTo;
-      return matchFrom && matchTo;
+      const matchCustomer = !q || String(job.customer ?? '').toLowerCase().includes(q);
+      return matchFrom && matchTo && matchCustomer;
     });
-  }, [jobs, dateFrom, dateTo]);
+  }, [jobs, dateFrom, dateTo, searchCustomer]);
 
   const summary = useMemo<SummaryState>(() =>
     filteredJobs.reduce((acc, job) => {
@@ -909,11 +912,21 @@ export default function JasaCatManager() {
         {/* ═══ DATE FILTER ═══ */}
         <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
           <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Cari nama customer"
+                value={searchCustomer}
+                onChange={(e) => setSearchCustomer(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 text-slate-700 transition"
+              />
+            </div>
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-600">
               <Calendar className="h-4 w-4 text-teal-500" />
               Filter Tanggal
             </div>
-            <div className="flex items-center gap-2 flex-1">
+            <div className="flex items-center gap-2">
               <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
                 className="rounded-xl border border-slate-200 py-2 px-3 text-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 text-slate-700 transition" />
               <span className="text-slate-300 font-medium">—</span>
