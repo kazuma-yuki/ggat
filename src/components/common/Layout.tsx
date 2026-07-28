@@ -4,13 +4,14 @@ import {
   Package, 
   ShoppingCart, 
   // FileText, 
-  Users, 
-  Settings, 
+  Users,
+  Settings,
   LogOut,
   Menu,
   X,
   ShoppingBag,
-  Wrench
+  Wrench,
+  History
 } from 'lucide-react';
 import { getCurrentUser, logout } from '../../utils/auth';
 
@@ -30,8 +31,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
     { id: 'inventory', label: 'Inventori', icon: Package },
     { id: 'reports-product', label: 'Laporan Produk', icon: ShoppingBag },
     { id: 'reports-service', label: 'Laporan Jasa Service', icon: Wrench },
-    // Hanya admin yang bisa lihat menu Pengguna
-    ...(user?.role === 'admin' ? [{ id: 'users', label: 'Pengguna', icon: Users }] : []),
+    // Hanya admin yang bisa lihat menu Pengguna & Riwayat Aktivitas
+    ...(user?.role === 'admin' ? [
+      { id: 'users', label: 'Pengguna', icon: Users },
+      { id: 'activity', label: 'Riwayat Aktivitas', icon: History },
+    ] : []),
   ];
 
   const handleLogout = () => {

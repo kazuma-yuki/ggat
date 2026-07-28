@@ -7,6 +7,7 @@ import SalesManager from './components/sales/SalesManager';
 import ReportsManager from './components/reports/ReportsManager';
 import JasaCatManager from './components/services/JasaCatManager';
 import UserManager from './components/users/UserManager';
+import ActivityLogManager from './components/activity/ActivityLogManager';
 import { getCurrentUser, validateSession } from './utils/auth';
 import type { User } from './types';
 import { initializeDefaultData } from './utils/storage';
@@ -102,6 +103,9 @@ function App() {
       case 'users':
         // Hanya admin yang bisa akses halaman pengguna
         return user.role === 'admin' ? <UserManager /> : <Dashboard />;
+      case 'activity':
+        // Riwayat aktivitas khusus admin (backend juga menolak non-admin)
+        return user.role === 'admin' ? <ActivityLogManager /> : <Dashboard />;
       default:
         return <Dashboard />;
     }

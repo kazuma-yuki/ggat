@@ -145,6 +145,22 @@ export const resendLoginOtp = (token: string) =>
 // Sumber kebenaran identitas & role user yang sedang login (validasi sessionToken).
 export const getMe = () => fetchJSON<AuthUser>(`${BASE_URL}/me`);
 
+// =====================
+// RIWAYAT AKTIVITAS (admin)
+// =====================
+export type ActivityLog = {
+  id: string;
+  userId: string;
+  username: string;
+  action: "create" | "update" | "delete";
+  entity: string;
+  entityId: string;
+  entityName: string;
+  description: string;
+  createdAt: string;
+};
+export const getActivityLogs = () => fetchJSON<ActivityLog[]>(`${BASE_URL}/activity-logs`);
+
 // Lupa sandi (semua di server)
 export const forgotPasswordRequest = (username: string) =>
   fetchJSON<{ token: string; email: string }>(`${BASE_URL}/forgot-password`, {
