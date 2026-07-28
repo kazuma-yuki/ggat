@@ -34,6 +34,8 @@ const ActivityLogManager: React.FC = () => {
   const [search, setSearch] = useState('');
   const [actionFilter, setActionFilter] = useState<'all' | 'create' | 'update' | 'delete'>('all');
   const [entityFilter, setEntityFilter] = useState<string>('all');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const reload = async () => {
     setLoading(true);
@@ -54,6 +56,9 @@ const ActivityLogManager: React.FC = () => {
     return logs.filter((l) => {
       if (actionFilter !== 'all' && l.action !== actionFilter) return false;
       if (entityFilter !== 'all' && l.entity !== entityFilter) return false;
+      const day = (l.createdAt || '').slice(0, 10); // YYYY-MM-DD
+      if (fromDate && day < fromDate) return false;
+      if (toDate && day > toDate) return false;
       if (!q) return true;
       return (
         l.username.toLowerCase().includes(q) ||
@@ -62,7 +67,7 @@ const ActivityLogManager: React.FC = () => {
         (ENTITY_LABEL[l.entity] ?? l.entity).toLowerCase().includes(q)
       );
     });
-  }, [logs, search, actionFilter, entityFilter]);
+  }, [logs, search, actionFilter, entityFilter, fromDate, toDate]);
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
@@ -119,6 +124,33 @@ const ActivityLogManager: React.FC = () => {
             ))}
           </select>
         </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-500 whitespace-nowrap">Periode</span>
+          <input
+            type="date"
+            value={fromDate}
+            max={toDate || undefined}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          />
+          <span className="text-gray-400">–</span>
+          <input
+            type="date"
+            value={toDate}
+            min={fromDate || undefined}
+            onChange={(e) => setToDate(e.target.value)}
+            className="px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          />
+          {(fromDate || toDate) && (
+            <button
+              type="button"
+              onClick={() => { setFromDate(''); setToDate(''); }}
+              className="text-xs text-gray-500 hover:text-gray-700 underline whitespace-nowrap"
+            >
+              Reset
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -167,7 +199,9 @@ const ActivityLogManager: React.FC = () => {
         </div>
       </div>
 
-      <p className="text-xs text-gray-400">Menampilkan {filtered.length} dari {logs.length} aktivitas terakhir.</p>
+      <p className="text-xs text-gray-400">
+        Menampilkan {filtered.length} dari {logs.length} aktivitas. Riwayat disimpan maksimal 1 bulan terakhir; data lebih lama otomatis dihapus.
+      </p>
     </div>
   );
 };
