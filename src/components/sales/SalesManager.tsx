@@ -217,21 +217,27 @@ const SalesManager: React.FC = () => {
     });
   }, [transactions, searchTerm, dateFrom, dateTo]);
 
+  // Seluruh produk tetap ditampilkan; yang stoknya habis atau tidak aktif
+  // hanya ditandai dan tidak bisa ditambahkan, agar pengguna tahu produknya ada.
   const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      if (product.stock <= 0) return false;
-      if (product.isAvailable === false) return false;
-
-      const q = productSearch.toLowerCase();
+    const q = productSearch.toLowerCase();
+    const match = products.filter((product) => {
       if (!q) return true;
-
       return (
         product.name.toLowerCase().includes(q) ||
         product.code.toLowerCase().includes(q) ||
         product.category.toLowerCase().includes(q)
       );
     });
+    // Produk siap jual didahulukan, yang bermasalah diletakkan di bawah.
+    const usable = (p: Product) => p.stock > 0 && p.isAvailable !== false;
+    return [...match.filter(usable), ...match.filter((p) => !usable(p))];
   }, [products, productSearch]);
+
+  const usableProductCount = useMemo(
+    () => filteredProducts.filter((p) => p.stock > 0 && p.isAvailable !== false).length,
+    [filteredProducts]
+  );
 
   const totals = useMemo(() => {
     const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
@@ -688,20 +694,32 @@ const SalesManager: React.FC = () => {
 
             <div className="max-h-60 overflow-y-auto rounded-xl border border-gray-200">
               {filteredProducts.length === 0 ? (
-                <div className="p-4 text-center text-gray-500">Tidak ada produk tersedia</div>
+                <div className="p-4 text-center text-gray-500">Produk tidak ditemukan</div>
               ) : (
                 <div className="divide-y divide-gray-100">
                   {filteredProducts.map((product) => {
                     const inCart = cart.find((item) => item.productId === product.id);
+                    const habis = product.stock <= 0;
+                    const nonaktif = product.isAvailable === false;
+                    const terpakai = !habis && !nonaktif;
                     return (
-                      <div key={product.id} className="p-3">
+                      <div key={product.id} className={`p-3 ${terpakai ? '' : 'bg-gray-50'}`}>
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="font-medium text-gray-900">{product.name}</p>
-                            <p className="text-xs text-gray-500">
+                            <div className="flex items-center gap-2">
+                              <p className={`font-medium ${terpakai ? 'text-gray-900' : 'text-gray-400'}`}>
+                                {product.name}
+                              </p>
+                              {!terpakai && (
+                                <span className="shrink-0 rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+                                  {nonaktif ? 'tidak aktif' : 'stok habis'}
+                                </span>
+                              )}
+                            </div>
+                            <p className={`text-xs ${terpakai ? 'text-gray-500' : 'text-gray-400'}`}>
                               Kategori: {product.category || 'Unknown'}
                             </p>
-                            <p className="text-xs text-gray-500">
+                            <p className={`text-xs ${terpakai ? 'text-gray-500' : 'text-gray-400'}`}>
                               Stok: {product.stock} • {formatCurrency(product.sellPrice)}
                             </p>
                             {inCart && (
@@ -714,7 +732,13 @@ const SalesManager: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => addQuickOne(product.id)}
-                            className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-green-700"
+                            disabled={!terpakai}
+                            title={terpakai ? undefined : nonaktif ? 'Produk tidak aktif' : 'Stok habis'}
+                            className={`inline-flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-medium transition ${
+                              terpakai
+                                ? 'bg-green-600 text-white hover:bg-green-700'
+                                : 'cursor-not-allowed bg-gray-200 text-gray-400'
+                            }`}
                           >
                             <Plus className="h-4 w-4" />
                             Tambah
@@ -726,6 +750,11 @@ const SalesManager: React.FC = () => {
                 </div>
               )}
             </div>
+            {filteredProducts.length > 0 && usableProductCount < filteredProducts.length && (
+              <p className="mt-1 text-xs text-gray-400">
+                {usableProductCount} dari {filteredProducts.length} produk siap dijual; sisanya stok habis atau tidak aktif.
+              </p>
+            )}
 
             <div className="overflow-hidden rounded-xl border border-gray-200">
               <div className="border-b border-gray-200 bg-gray-50 p-3">

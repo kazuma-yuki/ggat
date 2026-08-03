@@ -171,7 +171,15 @@ const Dashboard: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const lowStockProducts = products.filter((product) => product.stock <= product.minStock);
+  // Dipisah agar dua kondisi yang berbeda tidak tercampur:
+  // stok habis (0) berarti tidak bisa dijual sama sekali, sedangkan stok rendah
+  // masih bisa dijual tetapi perlu segera dipesan ulang.
+  const outOfStockProducts = products.filter((product) => product.stock <= 0);
+  const lowStockProducts = products.filter(
+    (product) => product.stock > 0 && product.stock <= product.minStock
+  );
+  // Gabungan keduanya, dipakai untuk daftar peringatan di bawah dashboard.
+  const stockAlertProducts = [...outOfStockProducts, ...lowStockProducts];
 
   const today = new Date();
   const todayDate = format(today, 'yyyy-MM-dd');
@@ -215,10 +223,18 @@ const Dashboard: React.FC = () => {
       subtitle: 'Produk aktif',
     },
     {
+      label: 'Stok Habis',
+      value: outOfStockProducts.length,
+      icon: AlertTriangle,
+      color: 'red' as const,
+      format: 'number' as const,
+      subtitle: 'Tidak bisa dijual',
+    },
+    {
       label: 'Stok Rendah',
       value: lowStockProducts.length,
       icon: AlertTriangle,
-      color: 'red' as const,
+      color: 'yellow' as const,
       format: 'number' as const,
       subtitle: 'Perlu restock',
     },
@@ -261,7 +277,7 @@ const Dashboard: React.FC = () => {
         {loading && <p className="mt-3 text-sm text-gray-500">Memuat data...</p>}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {statsCards.map((stat) => {
           const Icon = stat.icon;
           return (
@@ -353,28 +369,44 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {lowStockProducts.length > 0 && (
+      {stockAlertProducts.length > 0 && (
         <div className="rounded-xl border border-red-300 bg-red-50 p-6">
           <div className="mb-4 flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-red-600" />
-            <h3 className="text-lg font-semibold text-red-900">Peringatan Stok Rendah</h3>
+            <h3 className="text-lg font-semibold text-red-900">Peringatan Persediaan</h3>
+            <span className="text-sm text-red-700">
+              {outOfStockProducts.length} habis &middot; {lowStockProducts.length} rendah
+            </span>
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {lowStockProducts.map((product) => (
-              <div key={product.id} className="rounded-lg bg-white p-4">
-                <p className="font-medium text-gray-900">{product.name}</p>
-                <p className="text-sm text-gray-600">Kode: {product.code}</p>
-                <div className="mt-2 flex items-center justify-between">
-                  <span className="text-sm text-red-600">
-                    Stok: {product.stock} {product.unit}
-                  </span>
-                  <span className="rounded-full bg-red-100 px-2 py-1 text-xs text-red-800">
-                    Min: {product.minStock}
-                  </span>
+            {stockAlertProducts.map((product) => {
+              const habis = product.stock <= 0;
+              return (
+                <div
+                  key={product.id}
+                  className={`rounded-lg bg-white p-4 border-l-4 ${habis ? 'border-red-500' : 'border-yellow-400'}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-medium text-gray-900">{product.name}</p>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                      habis ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {habis ? 'Habis' : 'Rendah'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600">Kode: {product.code}</p>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className={`text-sm ${habis ? 'text-red-600' : 'text-yellow-700'}`}>
+                      Stok: {product.stock} {product.unit}
+                    </span>
+                    <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700">
+                      Min: {product.minStock}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
