@@ -13,7 +13,7 @@ import { clampCash, getCashError, cashLimitFor } from '../../utils/limits';
 import Modal from '../common/Modal';
 
 // ── Searchable dropdown inline ──────────────────────────────────────────────
-interface SelectOption { value: string; label: string; }
+interface SelectOption { value: string; label: string; disabled?: boolean; note?: string; }
 interface SearchableSelectProps {
   options: SelectOption[];
   value: string;
@@ -41,10 +41,17 @@ function SearchableSelect({ options, value, onChange, placeholder = '-- Pilih --
   }, [hlIdx]);
   function open() { setIsOpen(true); setSearch(''); setHlIdx(0); setTimeout(() => inputRef.current?.focus(), 0); }
   function close() { setIsOpen(false); setSearch(''); }
-  function select(opt: SelectOption) { onChange(opt.value); close(); }
+  function select(opt: SelectOption) { if (opt.disabled) return; onChange(opt.value); close(); }
+  /** Lompat ke opsi berikutnya yang masih bisa dipilih. */
+  function nextSelectable(from: number, dir: 1 | -1) {
+    for (let i = from; i >= 0 && i < filtered.length; i += dir) {
+      if (!filtered[i].disabled) return i;
+    }
+    return from;
+  }
   function handleKey(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'ArrowDown')  { e.preventDefault(); setHlIdx((i) => Math.min(i + 1, filtered.length - 1)); }
-    else if (e.key === 'ArrowUp')   { e.preventDefault(); setHlIdx((i) => Math.max(i - 1, 0)); }
+    if (e.key === 'ArrowDown')  { e.preventDefault(); setHlIdx((i) => nextSelectable(Math.min(i + 1, filtered.length - 1), 1)); }
+    else if (e.key === 'ArrowUp')   { e.preventDefault(); setHlIdx((i) => nextSelectable(Math.max(i - 1, 0), -1)); }
     else if (e.key === 'Enter')     { e.preventDefault(); if (filtered[hlIdx]) select(filtered[hlIdx]); }
     else if (e.key === 'Escape')    { close(); }
   }
@@ -92,14 +99,20 @@ function SearchableSelect({ options, value, onChange, placeholder = '-- Pilih --
             {filtered.length === 0
               ? <li className={`px-4 py-3 text-center text-xs ${dark ? 'text-slate-500' : 'text-gray-400'}`}>Produk tidak ditemukan</li>
               : filtered.map((opt, idx) => (
-                <li key={opt.value} role="option" aria-selected={opt.value === value}
-                  onClick={() => select(opt)} onMouseEnter={() => setHlIdx(idx)}
-                  className={`flex items-center justify-between px-4 py-2 cursor-pointer transition-colors ${
-                    dark
-                      ? opt.value === value ? 'bg-teal-500/20 text-teal-300 font-medium' : idx === hlIdx ? 'bg-slate-700 text-slate-200' : 'text-slate-300 hover:bg-slate-700'
-                      : opt.value === value ? 'bg-blue-50 text-blue-700 font-medium' : idx === hlIdx ? 'bg-gray-50 text-gray-800' : 'text-gray-700 hover:bg-gray-50'
+                <li key={opt.value} role="option" aria-selected={opt.value === value} aria-disabled={opt.disabled}
+                  onClick={() => select(opt)} onMouseEnter={() => { if (!opt.disabled) setHlIdx(idx); }}
+                  className={`flex items-center justify-between px-4 py-2 transition-colors ${
+                    opt.disabled
+                      ? `cursor-not-allowed ${dark ? 'text-slate-600' : 'text-gray-400'}`
+                      : `cursor-pointer ${dark
+                          ? opt.value === value ? 'bg-teal-500/20 text-teal-300 font-medium' : idx === hlIdx ? 'bg-slate-700 text-slate-200' : 'text-slate-300 hover:bg-slate-700'
+                          : opt.value === value ? 'bg-blue-50 text-blue-700 font-medium' : idx === hlIdx ? 'bg-gray-50 text-gray-800' : 'text-gray-700 hover:bg-gray-50'}`
                   }`}>
-                  <span className="flex-1 truncate">{hl(opt.label, search)}</span>
+                  <span className={`flex-1 truncate ${opt.disabled ? 'line-through' : ''}`}>{hl(opt.label, search)}</span>
+                  {opt.disabled && opt.note && (
+                    <span className={`ml-2 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                      dark ? 'bg-slate-700 text-slate-400' : 'bg-gray-100 text-gray-500'}`}>{opt.note}</span>
+                  )}
                   {opt.value === value && <span className={`ml-2 text-xs font-bold ${dark ? 'text-teal-400' : 'text-blue-500'}`}>✓</span>}
                 </li>
               ))
@@ -359,13 +372,23 @@ export default function JasaCatManager() {
   const isCatService = selectedService?.id === 'cat';
   const isLinkedService = !isOliService && !isCatService && !!selectedService?.linkedCategory;
 
-  // Produk dari linkedCategory (difilter dari semua produk di inventory)
-  const linkedProducts = useMemo(() => {
-    if (!selectedService?.linkedCategory) return [];
-    return allProducts.filter(
-      (p: Product) => p.category === selectedService.linkedCategory && p.isAvailable !== false && (p.stock ?? 0) > 0
-    );
+  // Seluruh produk pada kategori terkait, termasuk yang stoknya habis maupun
+  // tidak aktif. Perbandingan nama kategori diabaikan huruf besar/kecilnya agar
+  // selisih penulisan seperti "Spare Part" dan "spare part" tetap cocok.
+  const linkedCategoryProducts = useMemo(() => {
+    const cat = selectedService?.linkedCategory?.trim().toLowerCase();
+    if (!cat) return [];
+    return allProducts.filter((p: Product) => (p.category ?? '').trim().toLowerCase() === cat);
   }, [selectedService, allProducts]);
+
+  /** Produk yang benar-benar dapat dipakai: aktif dan stoknya masih ada. */
+  const isProductUsable = (p: Product) => p.isAvailable !== false && (p.stock ?? 0) > 0;
+
+  // Produk dari linkedCategory yang siap dipilih (dipakai untuk validasi & harga)
+  const linkedProducts = useMemo(
+    () => linkedCategoryProducts.filter(isProductUsable),
+    [linkedCategoryProducts]
+  );
 
   const selectedLinkedProduct = useMemo(() =>
     linkedProducts.find((p: Product) => String(p.id) === String(svcForm.selectedLinkedProductId)) ?? null,
@@ -1013,8 +1036,10 @@ export default function JasaCatManager() {
           </div>
 
           {/* ── Step 2: Tambah Service ── */}
-          <div className="rounded-2xl border border-teal-200 bg-white shadow-sm overflow-hidden">
-            <div className="flex items-center gap-3 px-5 py-4 border-b border-teal-100 bg-teal-50/60">
+          {/* Tanpa overflow-hidden: dropdown produk harus bisa menjulur keluar kartu.
+              Sudut atas dibulatkan langsung di header agar tampilannya tetap sama. */}
+          <div className="rounded-2xl border border-teal-200 bg-white shadow-sm">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-teal-100 bg-teal-50/60 rounded-t-2xl">
               <span className="h-7 w-7 rounded-lg bg-teal-500 text-white text-xs font-bold flex items-center justify-center">2</span>
               <h5 className="text-sm font-bold text-teal-800 uppercase tracking-wide">Tambah Service</h5>
             </div>
@@ -1079,10 +1104,15 @@ export default function JasaCatManager() {
                       value={svcForm.selectedOliId}
                       onChange={(val) => setSvcField('selectedOliId', val)}
                       placeholder="-- Pilih produk oli --"
-                      options={oliProducts.map((p) => ({
-                        value: String(p.id),
-                        label: `${p.name}${p.stock !== undefined ? ` (Stok: ${p.stock})` : ''}`,
-                      }))}
+                      options={oliProducts.map((p) => {
+                        const habis = (p.stock ?? 0) <= 0;
+                        return {
+                          value: String(p.id),
+                          label: `${p.name}${p.stock !== undefined ? ` (Stok: ${p.stock})` : ''}`,
+                          disabled: habis,
+                          note: habis ? 'stok habis' : undefined,
+                        };
+                      })}
                     />
                   )}
                 </div>
@@ -1094,20 +1124,33 @@ export default function JasaCatManager() {
                   <label className="mb-1.5 block text-xs font-semibold text-slate-600 uppercase tracking-wide">
                     Pilih Produk <span className="text-teal-600">{selectedService?.linkedCategory}</span> <span className="text-red-500">*</span>
                   </label>
-                  {linkedProducts.length === 0 ? (
+                  {linkedCategoryProducts.length === 0 ? (
                     <div className="rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-700">
-                      Tidak ada produk dengan kategori <strong>{selectedService?.linkedCategory}</strong> di inventori, atau stok habis.
+                      Tidak ada produk dengan kategori <strong>{selectedService?.linkedCategory}</strong> di inventori.
                     </div>
                   ) : (
+                    <>
                     <SearchableSelect
                       value={svcForm.selectedLinkedProductId}
                       onChange={(val) => setSvcField('selectedLinkedProductId', val)}
                       placeholder={`-- Pilih produk ${selectedService?.linkedCategory ?? ''} --`}
-                      options={linkedProducts.map((p) => ({
-                        value: String(p.id),
-                        label: `${p.name}${p.stock !== undefined ? ` (Stok: ${p.stock})` : ''} — Rp${(p.sellPrice ?? 0).toLocaleString('id-ID')}`,
-                      }))}
+                      options={linkedCategoryProducts.map((p) => {
+                        const habis = (p.stock ?? 0) <= 0;
+                        const nonaktif = p.isAvailable === false;
+                        return {
+                          value: String(p.id),
+                          label: `${p.name}${p.stock !== undefined ? ` (Stok: ${p.stock})` : ''} — Rp${(p.sellPrice ?? 0).toLocaleString('id-ID')}`,
+                          disabled: habis || nonaktif,
+                          note: nonaktif ? 'tidak aktif' : habis ? 'stok habis' : undefined,
+                        };
+                      })}
                     />
+                    {linkedProducts.length < linkedCategoryProducts.length && (
+                      <p className="mt-1 text-xs text-slate-400">
+                        {linkedProducts.length} dari {linkedCategoryProducts.length} produk dapat dipilih; sisanya stok habis atau tidak aktif.
+                      </p>
+                    )}
+                    </>
                   )}
                   {selectedLinkedProduct && (
                     <p className="mt-1.5 text-xs text-teal-600 flex items-center gap-1">✓ Harga produk Rp{(selectedLinkedProduct.sellPrice ?? 0).toLocaleString('id-ID')} ditambahkan ke total</p>
