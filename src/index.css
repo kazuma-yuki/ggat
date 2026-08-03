@@ -71,32 +71,6 @@
   .recharts-tooltip-wrapper { display: none !important; }
   .recharts-legend-wrapper { position: static !important; }
 
-  /* ── GRAFIK SAAT DICETAK ──
-     Recharts menghitung lebar SVG dari ukuran layar, sehingga saat layout
-     berubah menjadi halaman cetak ukurannya tidak ikut menyesuaikan dan
-     grafik meluber keluar kartu. SVG dipaksa mengikuti lebar wadahnya;
-     tinggi mengikuti viewBox sehingga proporsinya tetap terjaga. */
-  .recharts-responsive-container,
-  .recharts-wrapper {
-    width: 100% !important;
-    max-width: 100% !important;
-    height: auto !important;
-  }
-
-  .recharts-wrapper .recharts-surface,
-  .recharts-responsive-container svg {
-    width: 100% !important;
-    height: auto !important;
-    max-width: 100% !important;
-    overflow: visible !important;
-  }
-
-  /* Kartu grafik tidak boleh terpotong antar halaman */
-  .recharts-responsive-container { break-inside: avoid; page-break-inside: avoid; }
-
-  /* Cegah isi meluber keluar wadahnya */
-  .min-w-0 { min-width: 0 !important; }
-
   /* Grid 4 kolom → 2 kolom */
   .lg\:grid-cols-4 { grid-template-columns: repeat(2, 1fr) !important; }
 
