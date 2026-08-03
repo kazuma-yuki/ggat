@@ -20,6 +20,7 @@ import { getCategoryHex } from '../../utils/categoryColors';
 import { sanitizePhone, getPhoneError, PHONE_MAX_LENGTH } from '../../utils/phone';
 import { clampCash, getCashError, cashLimitFor } from '../../utils/limits';
 import { sanitizePlate, getPlateError, PLATE_MAX_INPUT } from '../../utils/plate';
+import { localISO } from '../../utils/datetime';
 import { getProducts, updateProductStock, addTransaction as addTransactionAPI, deleteTransaction as deleteTransactionAPI, getTransactions, type Product } from '../../service/api';
 
 type PaymentMethod = 'cash' | 'non_tunai';
@@ -123,7 +124,7 @@ const normalizeTransaction = (trx: SalesTransaction | Record<string, unknown>): 
     uangBayar: trx.uangBayar ? Number(trx.uangBayar) : undefined,
     notes: trx.notes ? String(trx.notes) : undefined,
     createdBy: String(trx.createdBy ?? 'unknown'),
-    createdAt: String(trx.createdAt ?? new Date().toISOString()),
+    createdAt: String(trx.createdAt ?? localISO()),
   };
 };
 
@@ -449,7 +450,7 @@ const SalesManager: React.FC = () => {
         notes: notes || undefined,
         uangBayar: paymentMethod === 'cash' ? (parseFloat(uangBayar.replace(/\./g, '')) || 0) : 0,
         createdBy: user?.username || 'unknown',
-        createdAt: new Date().toISOString(),
+        createdAt: localISO(),
       };
 
       saveTransactionToBackend(transaction);

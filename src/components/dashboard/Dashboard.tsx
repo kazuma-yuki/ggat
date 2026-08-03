@@ -25,6 +25,7 @@ import {
   normalizeAndFilterJobs,
 } from '../../utils/analytics';
 import { getTransactions, getJasaCatJobs, getProducts } from '../../utils/storage';
+import { localISO } from '../../utils/datetime';
 import { Product as ProductType, ChartData } from '../../types';
 import { format } from 'date-fns';
 
@@ -97,7 +98,7 @@ const Dashboard: React.FC = () => {
           createdAt:
             (tx as unknown as { createdAt?: string; date?: string }).createdAt ||
             (tx as unknown as { date?: string }).date ||
-            new Date().toISOString(),
+            localISO(),
           date: (tx as unknown as { date?: string }).date,
           total: safeNum((tx as unknown as { total?: unknown }).total),
           profit: safeNum((tx as unknown as { profit?: unknown }).profit),
@@ -122,7 +123,7 @@ const Dashboard: React.FC = () => {
         id: `jasa-${job.id}`,
         invoiceNumber: `JASA-${job.id}`,
         customerName: job.customer || 'Customer Jasa',
-        createdAt: job.dateRaw || new Date().toISOString(),
+        createdAt: job.dateRaw || localISO(),
         date: job.dateRaw || undefined,
         total: job.selling,
         profit: job.profit,

@@ -11,6 +11,7 @@ import { getServiceColor, getAllUsedColors } from '../../utils/categoryColors';
 import { sanitizePhone, getPhoneError, PHONE_MAX_LENGTH } from '../../utils/phone';
 import { clampCash, getCashError, cashLimitFor } from '../../utils/limits';
 import { sanitizePlate, getPlateError, PLATE_MAX_INPUT } from '../../utils/plate';
+import { localYMD } from '../../utils/datetime';
 import Modal from '../common/Modal';
 
 // ── Searchable dropdown inline ──────────────────────────────────────────────
@@ -239,7 +240,7 @@ type EditServiceForm = {
 // HELPERS
 // =====================
 
-const todayString = (): string => new Date().toISOString().slice(0, 10);
+const todayString = (): string => localYMD();
 const formatRp = (value: number): string => `Rp${Math.round(value || 0).toLocaleString('id-ID')}`;
 const formatRupiah = (value: string): string => {
   const digits = value.replace(/\D/g, '');
