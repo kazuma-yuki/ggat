@@ -267,6 +267,27 @@ const ReportsManager: React.FC<ReportsManagerProps> = ({ type }) => {
     } finally { setIsLoading(false); }
   }, []);
 
+  // Grafik Recharts mengukur lebar wadahnya sekali saat dirender. Ketika
+  // dialog cetak membuka layout halaman (sidebar hilang, kertas landscape),
+  // ukurannya perlu dihitung ulang agar grafik tidak meluber keluar kartu.
+  useEffect(() => {
+    const remeasure = () => window.dispatchEvent(new Event('resize'));
+    window.addEventListener('beforeprint', remeasure);
+    window.addEventListener('afterprint', remeasure);
+
+    // Safari dan sebagian browser tidak memicu beforeprint,
+    // sehingga perubahan media cetak turut dipantau.
+    const mql = window.matchMedia('print');
+    const onMedia = () => remeasure();
+    mql.addEventListener?.('change', onMedia);
+
+    return () => {
+      window.removeEventListener('beforeprint', remeasure);
+      window.removeEventListener('afterprint', remeasure);
+      mql.removeEventListener?.('change', onMedia);
+    };
+  }, []);
+
   useEffect(() => {
     void reloadData();
     const h1 = () => void reloadData();
