@@ -38,6 +38,7 @@ import {
 
 import { formatCurrency } from '../../utils/analytics';
 import { getAllUsedColors, loadColorCache } from '../../utils/categoryColors';
+import { MAX_STOCK } from '../../utils/limits';
 
 type ProductFormState = {
   name: string;
@@ -52,6 +53,13 @@ type ProductFormState = {
 
 type SortField = 'name' | 'category' | 'stock' | 'sellPrice' | 'modalPrice';
 type SortDir = 'asc' | 'desc';
+
+/** Hanya izinkan bilangan bulat 0..MAX_STOCK saat mengetik di kolom stok. */
+const clampStock = (value: string): string => {
+  const digits = value.replace(/\D/g, '');
+  if (digits === '') return '';
+  return String(Math.min(Number(digits), MAX_STOCK));
+};
 
 const formatRupiah = (value: string): string => {
   const digits = value.replace(/\D/g, '');
@@ -215,6 +223,22 @@ const InventoryManager: React.FC = () => {
     }
     const stockVal = Number(formData.stock) || 0;
     const minStockVal = Number(formData.minStock) || 0;
+    if (!Number.isInteger(stockVal) || !Number.isInteger(minStockVal)) {
+      alert('Stok dan stok minimum harus berupa bilangan bulat!');
+      return;
+    }
+    if (stockVal < 0 || minStockVal < 0) {
+      alert('Stok tidak boleh bernilai negatif!');
+      return;
+    }
+    if (stockVal > MAX_STOCK) {
+      alert(`Stok maksimal ${MAX_STOCK.toLocaleString('id-ID')} unit per produk!`);
+      return;
+    }
+    if (minStockVal > MAX_STOCK) {
+      alert(`Stok minimum maksimal ${MAX_STOCK.toLocaleString('id-ID')} unit!`);
+      return;
+    }
     if (stockVal < minStockVal) {
       alert('Stok awal tidak boleh lebih kecil dari stok minimum!');
       return;
@@ -664,10 +688,13 @@ const InventoryManager: React.FC = () => {
                 <input
                   type="number"
                   min="0"
+                  max={MAX_STOCK}
+                  step="1"
                   value={formData.stock}
-                  onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, stock: clampStock(e.target.value) })}
                   className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 ${
-                    formData.minStock && Number(formData.stock) < Number(formData.minStock)
+                    (formData.minStock && Number(formData.stock) < Number(formData.minStock)) ||
+                    Number(formData.stock) > MAX_STOCK
                       ? 'border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-100'
                       : 'border-gray-300 focus:border-blue-500 focus:ring-blue-100'
                   }`}
@@ -677,14 +704,17 @@ const InventoryManager: React.FC = () => {
                 {formData.minStock && Number(formData.stock) < Number(formData.minStock) && (
                   <p className="mt-1 text-xs text-red-500">Stok tidak boleh kurang dari stok minimum ({formData.minStock})</p>
                 )}
+                <p className="mt-1 text-xs text-gray-400">Maksimal {MAX_STOCK.toLocaleString('id-ID')} unit</p>
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">Stok Minimum *</label>
                 <input
                   type="number"
                   min="0"
+                  max={MAX_STOCK}
+                  step="1"
                   value={formData.minStock}
-                  onChange={(e) => setFormData({ ...formData, minStock: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, minStock: clampStock(e.target.value) })}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   placeholder="0"
                   required

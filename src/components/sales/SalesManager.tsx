@@ -17,6 +17,8 @@ import { format } from 'date-fns';
 import { getCurrentUser } from '../../utils/auth';
 import { formatCurrency } from '../../utils/analytics';
 import { getCategoryHex } from '../../utils/categoryColors';
+import { sanitizePhone, getPhoneError, PHONE_MAX_LENGTH } from '../../utils/phone';
+import { clampCash, getCashError, cashLimitFor } from '../../utils/limits';
 import { getProducts, updateProductStock, addTransaction as addTransactionAPI, deleteTransaction as deleteTransactionAPI, getTransactions, type Product } from '../../service/api';
 
 type PaymentMethod = 'cash' | 'non_tunai';
@@ -270,14 +272,16 @@ const SalesManager: React.FC = () => {
       alert('Keranjang masih kosong');
       return;
     }
-    if (!customerPhone.trim()) {
-      alert('Nomor Handphone wajib diisi');
+    const phoneError = getPhoneError(customerPhone);
+    if (phoneError) {
+      alert(phoneError);
       return;
     }
     if (paymentMethod === 'cash') {
       const bayar = parseFloat(uangBayar.replace(/\./g, '')) || 0;
-      if (bayar < totals.total) {
-        alert(`Uang pembayaran kurang! Total: ${formatCurrency(totals.total)}, Dibayar: ${formatCurrency(bayar)}`);
+      const cashError = getCashError(bayar, totals.total);
+      if (cashError) {
+        alert(`${cashError}. Total: ${formatCurrency(totals.total)}, Dibayar: ${formatCurrency(bayar)}`);
         return;
       }
     }
@@ -831,17 +835,18 @@ const SalesManager: React.FC = () => {
                 type="tel"
                 inputMode="numeric"
                 value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value.replace(/\D/g, ''))}
+                onChange={(e) => setCustomerPhone(sanitizePhone(e.target.value))}
+                maxLength={PHONE_MAX_LENGTH}
                 className={`w-full rounded-xl border px-3 py-2.5 outline-none transition focus:ring-2 focus:ring-blue-100 ${
-                  customerPhone.trim() === ''
+                  getPhoneError(customerPhone)
                     ? 'border-red-300 focus:border-red-400'
                     : 'border-gray-300 focus:border-blue-500'
                 }`}
                 placeholder="Wajib diisi (contoh: 08123456789) "
                 required
               />
-              {customerPhone.trim() === '' && (
-                <p className="mt-1 text-xs text-red-500">Nomor handphone wajib diisi</p>
+              {getPhoneError(customerPhone) && (
+                <p className="mt-1 text-xs text-red-500">{getPhoneError(customerPhone)}</p>
               )}
             </div>
 
@@ -935,14 +940,17 @@ const SalesManager: React.FC = () => {
                       inputMode="numeric"
                       value={uangBayar}
                       onChange={(e) => {
-                        const digits = e.target.value.replace(/\D/g, '');
-                        setUangBayar(digits ? Number(digits).toLocaleString('id-ID') : '');
+                        const capped = clampCash(e.target.value, totals.total);
+                        setUangBayar(capped ? Number(capped).toLocaleString('id-ID') : '');
                       }}
                       className="bg-transparent outline-none border-none p-0"
                       style={{ width: `${Math.max((uangBayar || '0').length, 1)}ch` }}
                       placeholder="0"
                     />
                   </div>
+                  <p className="mt-1 text-xs text-gray-400">
+                    Maksimal {formatCurrency(cashLimitFor(totals.total))}
+                  </p>
                 </div>
 
                 {/* Kembalian / Kurang */}

@@ -15,10 +15,6 @@ export type JasaCatJob = Record<string, unknown> & {
   deleted?: boolean;
 };
 
-export type PaintBatchItem = {
-  id: string; name: string; cost: number; remainingUses: number;
-};
-
 export type CategoryEntry = { name: string; color: string };
 
 // =====================
@@ -216,36 +212,6 @@ export const clearJasaCatJobs = async (): Promise<void> => {
 };
 
 // =====================
-// PAINT BATCHES
-// =====================
-export const getPaintBatches = async (): Promise<PaintBatchItem[]> => {
-  const data = await api.getPaintBatches();
-  return (data as PaintBatchItem[]).map(p => ({ ...p, id: String(p.id) }));
-};
-
-export const savePaintBatches = async (): Promise<void> => { /* noop */ };
-
-export const addPaintBatch = async (batch: Partial<PaintBatchItem>): Promise<PaintBatchItem> => {
-  const newBatch = {
-    name: batch.name || 'Batch Cat',
-    cost: batch.cost || 0,
-    remainingUses: batch.remainingUses ?? 4,
-  };
-  const result = await api.addPaintBatch(newBatch) as PaintBatchItem;
-  return { ...newBatch, id: String(result.id) };
-};
-
-export const updatePaintBatch = async (id: string, updates: Partial<PaintBatchItem>): Promise<PaintBatchItem | null> => {
-  const result = await api.updatePaintBatch(id, updates) as PaintBatchItem;
-  return { ...result, id: String(result.id) };
-};
-
-export const deletePaintBatch = async (id: string): Promise<boolean> => {
-  await api.deletePaintBatch(id);
-  return true;
-};
-
-// =====================
 // CATEGORIES
 // =====================
 export const getCategoryColors = async (): Promise<CategoryEntry[]> => {
@@ -307,10 +273,10 @@ export const deleteCategory = async (name: string): Promise<string[]> => {
 // EXPORT / IMPORT (tetap jalan dari backend data)
 // =====================
 export const exportData = async (): Promise<void> => {
-  const [products, transactions, stockMovements, jasaCatJobs, paintBatches] = await Promise.all([
-    getProducts(), getTransactions(), getStockMovements(), getJasaCatJobs(), getPaintBatches(),
+  const [products, transactions, stockMovements, jasaCatJobs] = await Promise.all([
+    getProducts(), getTransactions(), getStockMovements(), getJasaCatJobs(),
   ]);
-  const data = { products, transactions, stockMovements, jasaCatJobs, paintBatches, exportDate: new Date().toISOString() };
+  const data = { products, transactions, stockMovements, jasaCatJobs, exportDate: new Date().toISOString() };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

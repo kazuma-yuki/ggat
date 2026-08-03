@@ -24,3 +24,20 @@ dist-ssr
 *.sw?
 .env
 penulisan
+
+# Berkas sementara Microsoft Word (file kunci saat dokumen dibuka)
+~$*
+*.tmp
+~WRL*.tmp
+
+# Dokumen skripsi — bukan bagian dari kode program
+*.docx
+*.doc
+*.pdf
+*.drawio
+*.bib
+
+# Basis data lokal
+*.db
+*.sqlite
+*.sqlite3

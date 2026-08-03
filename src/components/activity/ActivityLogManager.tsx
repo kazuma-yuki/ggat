@@ -29,6 +29,7 @@ const formatWaktu = (iso: string): string => {
   return d.toLocaleString('id-ID', {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
+    timeZone: 'Asia/Jakarta', // selalu tampil WIB, apa pun zona perangkat pengguna
   });
 };
 
