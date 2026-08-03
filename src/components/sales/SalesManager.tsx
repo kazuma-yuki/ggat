@@ -19,6 +19,7 @@ import { formatCurrency } from '../../utils/analytics';
 import { getCategoryHex } from '../../utils/categoryColors';
 import { sanitizePhone, getPhoneError, PHONE_MAX_LENGTH } from '../../utils/phone';
 import { clampCash, getCashError, cashLimitFor } from '../../utils/limits';
+import { sanitizePlate, getPlateError, PLATE_MAX_INPUT } from '../../utils/plate';
 import { getProducts, updateProductStock, addTransaction as addTransactionAPI, deleteTransaction as deleteTransactionAPI, getTransactions, type Product } from '../../service/api';
 
 type PaymentMethod = 'cash' | 'non_tunai';
@@ -281,6 +282,11 @@ const SalesManager: React.FC = () => {
     const phoneError = getPhoneError(customerPhone);
     if (phoneError) {
       alert(phoneError);
+      return;
+    }
+    const plateError = getPlateError(nomorPolisi);
+    if (plateError) {
+      alert(plateError);
       return;
     }
     if (paymentMethod === 'cash') {
@@ -887,10 +893,18 @@ const SalesManager: React.FC = () => {
               <input
                 type="text"
                 value={nomorPolisi}
-                onChange={(e) => setNomorPolisi(e.target.value.toUpperCase())}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                onChange={(e) => setNomorPolisi(sanitizePlate(e.target.value))}
+                maxLength={PLATE_MAX_INPUT}
+                className={`w-full rounded-xl border px-3 py-2.5 outline-none transition focus:ring-2 focus:ring-blue-100 ${
+                  getPlateError(nomorPolisi)
+                    ? 'border-red-300 focus:border-red-400'
+                    : 'border-gray-300 focus:border-blue-500'
+                }`}
                 placeholder="Opsional (contoh: B 1234 XY)"
               />
+              {getPlateError(nomorPolisi) && (
+                <p className="mt-1 text-xs text-red-500">{getPlateError(nomorPolisi)}</p>
+              )}
             </div>
 
             {/* Nama Customer — URUTAN KETIGA */}

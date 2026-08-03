@@ -10,6 +10,7 @@ import { Plus, Trash2, Settings, X, ChevronDown, ChevronUp, Pencil, Check, Calen
 import { getServiceColor, getAllUsedColors } from '../../utils/categoryColors';
 import { sanitizePhone, getPhoneError, PHONE_MAX_LENGTH } from '../../utils/phone';
 import { clampCash, getCashError, cashLimitFor } from '../../utils/limits';
+import { sanitizePlate, getPlateError, PLATE_MAX_INPUT } from '../../utils/plate';
 import Modal from '../common/Modal';
 
 // ── Searchable dropdown inline ──────────────────────────────────────────────
@@ -195,7 +196,6 @@ const DEFAULT_SERVICES: CustomServiceType[] = [
 type ServiceItemForm = {
   serviceTypeId: string;
   motorType: MotorTypeId;
-  catColor: CatColor;
   selectedOliId: string; // id produk oli dari inventory (dropdown)
   selectedLinkedProductId: string; // id produk dari linkedCategory
   discount: string;
@@ -287,7 +287,6 @@ const emptyTransactionForm = (): TransactionForm => ({
 const emptyServiceItemForm = (serviceTypes: CustomServiceType[]): ServiceItemForm => ({
   serviceTypeId: serviceTypes[0]?.id ?? 'cat',
   motorType: 'bebek',
-  catColor: 'merah',
   selectedOliId: '',
   selectedLinkedProductId: '',
   discount: '',
@@ -300,7 +299,7 @@ const emptyServiceItemForm = (serviceTypes: CustomServiceType[]): ServiceItemFor
 export default function JasaCatManager() {
   const [jobs, setJobs] = useState<JasaCatJob[]>([]);
   const [txForm, setTxForm] = useState<TransactionForm>(emptyTransactionForm());
-  const [svcForm, setSvcForm] = useState<ServiceItemForm>({ serviceTypeId: 'cat', motorType: 'bebek', catColor: 'merah', selectedOliId: '', selectedLinkedProductId: '', discount: '' });
+  const [svcForm, setSvcForm] = useState<ServiceItemForm>({ serviceTypeId: 'cat', motorType: 'bebek', selectedOliId: '', selectedLinkedProductId: '', discount: '' });
   const [cart, setCart] = useState<CartItem[]>([]);
   const [dateFrom, setDateFrom] = useState(todayString());
   const [dateTo, setDateTo] = useState(todayString());
@@ -369,8 +368,10 @@ export default function JasaCatManager() {
     [serviceTypes, svcForm.serviceTypeId]
   );
   const isOliService = selectedService?.id === 'oli';
-  const isCatService = selectedService?.id === 'cat';
-  const isLinkedService = !isOliService && !isCatService && !!selectedService?.linkedCategory;
+  const isCatService = selectedService?.id === 'cat'; // hanya untuk penamaan jenis pada data
+  // Service Cat kini diperlakukan sama seperti jenis service lainnya: bila
+  // dihubungkan ke sebuah kategori inventori, produknya dipilih dari daftar.
+  const isLinkedService = !isOliService && !!selectedService?.linkedCategory;
 
   // Seluruh produk pada kategori terkait, termasuk yang stoknya habis maupun
   // tidak aktif. Perbandingan nama kategori diabaikan huruf besar/kecilnya agar
@@ -440,7 +441,6 @@ export default function JasaCatManager() {
       serviceType: isOliService ? 'oli' : isCatService ? 'cat' : 'custom',
       serviceColor: selectedService?.color,
       motorType: svcForm.motorType,
-      catColor: isCatService ? svcForm.catColor : undefined,
       oliProductId: isOliService ? svcForm.selectedOliId || undefined : isLinkedService ? svcForm.selectedLinkedProductId || undefined : undefined,
       oliProductName: isOliService ? selectedOliName : isLinkedService && selectedLinkedProduct ? selectedLinkedProduct.name : undefined,
       discount: discountPct,
@@ -450,7 +450,7 @@ export default function JasaCatManager() {
       profit,
     };
     setCart((prev) => [...prev, item]);
-    setSvcForm((prev) => ({ ...prev, serviceTypeId: serviceTypes[0]?.id ?? 'cat', catColor: 'merah', selectedOliId: '', selectedLinkedProductId: '', discount: '' }));
+    setSvcForm((prev) => ({ ...prev, serviceTypeId: serviceTypes[0]?.id ?? 'cat', selectedOliId: '', selectedLinkedProductId: '', discount: '' }));
   };
 
   const handleRemoveFromCart = (cartId: string) => {
@@ -463,6 +463,8 @@ export default function JasaCatManager() {
     if (cart.length === 0) { alert('Tambahkan minimal 1 service ke keranjang!'); return; }
     const phoneError = getPhoneError(txForm.noHandphone);
     if (phoneError) { alert(phoneError); return; }
+    const plateError = getPlateError(txForm.nomorPolisi);
+    if (plateError) { alert(plateError); return; }
     if (txForm.paymentMethod === 'cash') {
       const cashError = getCashError(uangBayarNum, cartTotal);
       if (cashError) {
@@ -1019,9 +1021,15 @@ export default function JasaCatManager() {
                 </div>
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold text-slate-600 uppercase tracking-wide">Nomor Polisi</label>
-                  <input value={txForm.nomorPolisi} onChange={(e) => setTxField('nomorPolisi', e.target.value.toUpperCase())}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50 transition font-mono tracking-wider uppercase"
+                  <input value={txForm.nomorPolisi} onChange={(e) => setTxField('nomorPolisi', sanitizePlate(e.target.value))}
+                    maxLength={PLATE_MAX_INPUT}
+                    className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none focus:ring-2 transition font-mono tracking-wider uppercase ${
+                      getPlateError(txForm.nomorPolisi)
+                        ? 'border-red-200 focus:border-red-400 focus:ring-red-50 bg-red-50/30'
+                        : 'border-slate-200 focus:border-teal-400 focus:ring-teal-50'
+                    }`}
                     placeholder="Contoh: B 1234 XY" />
+                  {getPlateError(txForm.nomorPolisi) && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><span>⚠</span> {getPlateError(txForm.nomorPolisi)}</p>}
                 </div>
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold text-slate-600 uppercase tracking-wide">
@@ -1072,24 +1080,6 @@ export default function JasaCatManager() {
                 </div>
               </div>
 
-              {/* Warna Cat */}
-              {isCatService && (
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-slate-600 uppercase tracking-wide">Warna Cat</label>
-                  <div className="flex gap-2">
-                    {(Object.entries(CAT_COLOR_LABELS) as [CatColor, string][]).map(([key, label]) => (
-                      <button key={key} type="button" onClick={() => setSvcField('catColor', key)}
-                        className={`flex-1 rounded-xl border py-2.5 text-sm font-semibold transition ${
-                          svcForm.catColor === key
-                            ? 'bg-teal-500 border-teal-500 text-white shadow-sm'
-                            : 'bg-white border-slate-200 text-slate-600 hover:border-teal-400 hover:text-teal-600'
-                        }`}>
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* Pilih Produk Oli */}
               {isOliService && (
