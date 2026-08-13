@@ -902,12 +902,16 @@ const InventoryManager: React.FC = () => {
                                 setEditingCategoryError('Warna sudah digunakan');
                                 return;
                               }
-                              const updated = await editCategory(entry.name, editingCategoryValue, editingCategoryColor);
-                              setDynamicCategories(updated);
-                              setCategoryEntries(await getCategoryColors());
-                              setEditingCategory(null);
-                              setEditingCategoryError('');
-                              window.dispatchEvent(new Event('appDataChanged'));
+                              try {
+                                const updated = await editCategory(entry.name, editingCategoryValue, editingCategoryColor);
+                                setDynamicCategories(updated);
+                                await loadProducts();
+                                setEditingCategory(null);
+                                setEditingCategoryError('');
+                                window.dispatchEvent(new Event('appDataChanged'));
+                              } catch (err: unknown) {
+                                setEditingCategoryError(getErrorMessage(err));
+                              }
                             }}
                             className="rounded bg-green-600 px-2 py-1 text-xs text-white hover:bg-green-700"
                           >Simpan</button>
@@ -930,10 +934,13 @@ const InventoryManager: React.FC = () => {
                             type="button"
                             onClick={async () => {
                               if (!window.confirm(`Hapus kategori "${entry.name}"?`)) return;
-                              const updated = await deleteCategory(entry.name);
-                              setDynamicCategories(updated);
-                              setCategoryEntries(await getCategoryColors());
-                              window.dispatchEvent(new Event('appDataChanged'));
+                              try {
+                                await deleteCategory(entry.name);
+                                await loadProducts();
+                                window.dispatchEvent(new Event('appDataChanged'));
+                              } catch (err: unknown) {
+                                alert(getErrorMessage(err));
+                              }
                             }}
                             className="rounded p-1.5 text-gray-400 hover:bg-red-100 hover:text-red-600"
                           ><Trash2 className="h-3.5 w-3.5" /></button>
